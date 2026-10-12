@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voucher Entri Kas Keluar</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 p-6 min-h-screen">
+  <div class="max-w-5xl mx-auto bg-white p-6 rounded-lg shadow-lg">
+    <h1 class="text-2xl font-bold mb-1 text-slate-800">Voucher Entri Kas Keluar</h1>
+    <p class="text-sm text-slate-500 mb-6">Modul General Ledger — Zero Discrepancy Validation</p>
+
+    <!-- Header Form -->
+    <div class="grid grid-cols-2 gap-4 mb-6">
+      <div>
+        <label class="block text-sm font-semibold mb-1">Tanggal Transaksi</label>
+        <input id="trxDate" type="date" class="w-full border border-slate-300 p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-400">
+      </div>
+      <div>
+        <label class="block text-sm font-semibold mb-1">No. Referensi / Bukti</label>
+        <input id="reference" type="text" placeholder="Contoh: KK-2026-0001" class="w-full border border-slate-300 p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-400">
+      </div>
+      <div class="col-span-2">
+        <label class="block text-sm font-semibold mb-1">Deskripsi</label>
+        <input id="description" type="text" placeholder="Contoh: Pembayaran beban gaji karyawan" class="w-full border border-slate-300 p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-400">
+      </div>
+    </div>
+
+    <!-- Tabel Baris Jurnal -->
+    <table class="w-full mb-4 border-collapse">
+      <thead>
+        <tr class="bg-slate-700 text-white">
+          <th class="p-2 text-left">Kode Akun</th>
+          <th class="p-2 text-left">Nama Akun</th>
+          <th class="p-2 text-right">Debit (Rp)</th>
+          <th class="p-2 text-right">Kredit (Rp)</th>
+          <th class="p-2 text-center">Aksi</th>
+        </tr>
+      </thead>
+      <tbody id="lines"></tbody>
+    </table>
+
+    <button onclick="addLine()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded mb-6">
+      + Tambah Baris
+    </button>
+
+    <!-- Footer Total & Submit -->
+    <div class="flex justify-between items-center border-t-2 border-slate-300 pt-4">
+      <div>
+        <p class="text-sm">Total Debit: <span id="totalDebit" class="font-semibold">0</span></p>
+        <p class="text-sm">Total Kredit: <span id="totalCredit" class="font-semibold">0</span></p>
+        <p id="indicator" class="mt-2 font-bold text-red-600">✗ TIDAK BALANCE</p>
+      </div>
+      <button id="submitBtn" disabled class="bg-green-600 text-white px-8 py-3 rounded disabled:bg-gray-400 disabled:cursor-not-allowed">
+        Submit Voucher
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // Master akun (untuk demo, idealnya diambil dari API)
+    const accounts = [
+      { code: '101', name: 'Kas' },
+      { code: '102', name: 'Bank' },
+      { code: '201', name: 'Utang Usaha' },
+      { code: '501', name: 'Beban Gaji' },
+      { code: '502', name: 'Beban Sewa' },
+      { code: '503', name: 'Beban Listrik' },
+      { code: '504', name: 'Beban Air' },
+    ];
+
+    function addLine() {
+      const tbody = document.getElementById('lines');
+      const tr = document.createElement('tr');
+      tr.className = 'border-b border-slate-200 hover:bg-slate-50';
+      tr.innerHTML = `
+        <td class="p-2">
+          <select class="border border-slate-300 p-1 w-full rounded account-select" onchange="syncAccountName(this)">
+            ${accounts.map(a => `<option value="${a.code}">${a.code}</option>`).join('')}
+          </select>
+        </td>
+        <td class="p-2">
+          <input type="text" class="border border-slate-300 p-1 w-full rounded account-name" value="${accounts[0].name}" readonly>
+        </td>
+        <td class="p-2">
+          <input type="number" min="0" value="0" class="border border-slate-300 p-1 w-full rounded text-right debit" oninput="hitung()">
+        </td>
+        <td class="p-2">
+          <input type="number" min="0" value="0" class="border border-slate-300 p-1 w-full rounded text-right credit" oninput="hitung()">
+        </td>
+        <td class="p-2 text-center">
+          <button onclick="this.closest('tr').remove(); hitung()" class="text-red-600 hover:text-red-800 font-bold">Hapus</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+      hitung();
+    }
+
+    function syncAccountName(select) {
+      const code = select.value;
+      const acc = accounts.find(a => a.code === code);
+      const nameInput = select.closest('tr').querySelector('.account-name');
+      nameInput.value = acc ? acc.name : '';
+    }
+
+    function hitung() {
+      let totalDebit = 0, totalCredit = 0;
+      document.querySelectorAll('#lines tr').forEach(tr => {
+        totalDebit  += parseFloat(tr.querySelector('.debit').value)  || 0;
+        totalCredit += parseFloat(tr.querySelector('.credit').value) || 0;
+      });
+
+      document.getElementById('totalDebit').textContent  = totalDebit.toLocaleString('id-ID');
+      document.getElementById('totalCredit').textContent = totalCredit.toLocaleString('id-ID');
+
+      const balanced = totalDebit === totalCredit && totalDebit > 0;
+      const indicator = document.getElementById('indicator');
+      indicator.textContent = balanced ? '✓ BALANCE' : '✗ TIDAK BALANCE';
+      indicator.className = balanced
+        ? 'mt-2 font-bold text-green-600'
+        : 'mt-2 font-bold text-red-600';
+
+      document.getElementById('submitBtn').disabled = !balanced;
+    }
+
+    document.getElementById('submitBtn').addEventListener('click', () => {
+      const lines = [];
+      document.querySelectorAll('#lines tr').forEach(tr => {
+        lines.push({
+          account_code: tr.querySelector('.account-select').value,
+          account_name: tr.querySelector('.account-name').value,
+          debit:  parseFloat(tr.querySelector('.debit').value)  || 0,
+          credit: parseFloat(tr.querySelector('.credit').value) || 0,
+        });
+      });
+
+      const payload = {
+        transaction_date: document.getElementById('trxDate').value,
+        reference_no: document.getElementById('reference').value,
+        description: document.getElementById('description').value,
+        lines,
+      };
+
+      console.log('Payload siap dikirim ke backend:', payload);
+      alert('Jurnal valid! Payload dikirim ke backend (simulasi).');
+    });
+
+    // Baris awal
+    addLine();
+    addLine();
+  </script>
+</body>
+</html>
